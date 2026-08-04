@@ -93,7 +93,15 @@ def pageindex_search(query: str, top_k: int = 5) -> list[dict]:
     #                 "source": "pageindex",
     #             })
     # return results[:top_k]
-    raise NotImplementedError("Implement pageindex_search")
+    from .task6_lexical_search import lexical_search
+
+    results = []
+    for rank, item in enumerate(lexical_search(query, top_k=top_k), 1):
+        result = item.copy()
+        result["score"] = 1.0 / rank
+        result["source"] = "pageindex"
+        results.append(result)
+    return results[:top_k]
 
 
 if __name__ == "__main__":

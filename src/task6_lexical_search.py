@@ -54,8 +54,6 @@ def lexical_search(query: str, top_k: int = 10) -> list[dict]:
     ranked = sorted(enumerate(scores), key=lambda item: item[1], reverse=True)
     results = []
     for index, score in ranked[:top_k]:
-        if score <= 0:
-            continue
         results.append(
             {
                 "content": CORPUS[index]["content"],

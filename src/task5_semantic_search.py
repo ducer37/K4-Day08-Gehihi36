@@ -1,6 +1,36 @@
 """Task 5 - Semantic search over the Chroma index from Task 4."""
 
-from .task4_chunking_indexing import embed_texts, get_collection
+import re
+
+from .task4_chunking_indexing import chunk_documents, embed_texts, get_collection, load_documents
+
+
+def _tokenize(text: str) -> set[str]:
+    return set(re.findall(r"[\wÀ-ỹ]+", text.lower(), flags=re.UNICODE))
+
+
+def _offline_semantic_search(query: str, top_k: int) -> list[dict]:
+    query_tokens = _tokenize(query)
+    if not query_tokens:
+        return []
+
+    results = []
+    for chunk in chunk_documents(load_documents()):
+        content_tokens = _tokenize(chunk["content"])
+        if not content_tokens:
+            continue
+        overlap = len(query_tokens & content_tokens)
+        score = overlap / len(query_tokens | content_tokens)
+        if score > 0:
+            results.append(
+                {
+                    "content": chunk["content"],
+                    "score": round(score, 4),
+                    "metadata": chunk.get("metadata", {}),
+                }
+            )
+
+    return sorted(results, key=lambda item: item["score"], reverse=True)[:top_k]
 
 
 def semantic_search(query: str, top_k: int = 10) -> list[dict]:
@@ -14,7 +44,10 @@ def semantic_search(query: str, top_k: int = 10) -> list[dict]:
     if collection.count() == 0:
         return []
 
-    query_vector = embed_texts([query])[0]
+    try:
+        query_vector = embed_texts([query])[0]
+    except RuntimeError:
+        return _offline_semantic_search(query, top_k)
     results = collection.query(
         query_embeddings=[query_vector],
         n_results=top_k,
