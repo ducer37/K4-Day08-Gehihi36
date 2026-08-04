@@ -31,30 +31,28 @@ def rerank_cross_encoder(
     Returns:
         List of top_k candidates, re-scored và sorted by rerank_score descending.
     """
-    # TODO: Implement cross-encoder reranking
-    #
-    # Option A: Jina Reranker API
-    # import requests
-    # response = requests.post(
-    #     "https://api.jina.ai/v1/rerank",
-    #     headers={"Authorization": f"Bearer {JINA_API_KEY}"},
-    #     json={
-    #         "model": "jina-reranker-v2-base-multilingual",
-    #         "query": query,
-    #         "documents": [c["content"] for c in candidates],
-    #         "top_n": top_k
-    #     }
-    # )
-    # reranked = response.json()["results"]
-    # return [
-    #     {**candidates[r["index"]], "score": r["relevance_score"]}
-    #     for r in reranked
-    # ]
-    #
+    
+    #Option A: Jina Reranker API
+    import requests
+    response = requests.post(
+        "https://api.jina.ai/v1/rerank",
+        headers={"Authorization": f"Bearer {JINA_API_KEY}"},
+        json={
+            "model": "jina-reranker-v2-base-multilingual",
+            "query": query,
+            "documents": [c["content"] for c in candidates],
+            "top_n": top_k
+        }
+    )
+    reranked = response.json()["results"]
+    return [
+        {**candidates[r["index"]], "score": r["relevance_score"]}
+        for r in reranked
+    ]
+    
     # Option B: Local model (Qwen3-Reranker)
     # from transformers import AutoModelForSequenceClassification, AutoTokenizer
-    # ...
-    raise NotImplementedError("Implement rerank_cross_encoder")
+    ...
 
 
 def rerank_mmr(
@@ -78,36 +76,35 @@ def rerank_mmr(
         List of top_k candidates selected by MMR.
     """
     # TODO: Implement MMR
-    #
-    # selected = []
-    # remaining = list(range(len(candidates)))
-    #
-    # for _ in range(min(top_k, len(candidates))):
-    #     best_idx = None
-    #     best_score = float('-inf')
-    #
-    #     for idx in remaining:
-    #         # Relevance to query
-    #         relevance = cosine_sim(query_embedding, candidates[idx]["embedding"])
-    #
-    #         # Max similarity to already selected
-    #         max_sim_to_selected = 0
-    #         for sel_idx in selected:
-    #             sim = cosine_sim(candidates[idx]["embedding"], candidates[sel_idx]["embedding"])
-    #             max_sim_to_selected = max(max_sim_to_selected, sim)
-    #
-    #         # MMR score
-    #         mmr_score = lambda_param * relevance - (1 - lambda_param) * max_sim_to_selected
-    #
-    #         if mmr_score > best_score:
-    #             best_score = mmr_score
-    #             best_idx = idx
-    #
-    #     selected.append(best_idx)
-    #     remaining.remove(best_idx)
-    #
-    # return [candidates[i] for i in selected]
-    raise NotImplementedError("Implement rerank_mmr")
+    
+    selected = []
+    remaining = list(range(len(candidates)))
+    
+    for _ in range(min(top_k, len(candidates))):
+        best_idx = None
+        best_score = float('-inf')
+    
+        for idx in remaining:
+             # Relevance to query
+            relevance = cosine_sim(query_embedding, candidates[idx]["embedding"])
+    
+             # Max similarity to already selected
+            max_sim_to_selected = 0
+            for sel_idx in selected:
+                sim = cosine_sim(candidates[idx]["embedding"], candidates[sel_idx]["embedding"])
+                max_sim_to_selected = max(max_sim_to_selected, sim)
+    
+          # MMR score
+            mmr_score = lambda_param * relevance - (1 - lambda_param) * max_sim_to_selected
+    
+            if mmr_score > best_score:
+                best_score = mmr_score
+                best_idx = idx
+    
+        selected.append(best_idx)
+        remaining.remove(best_idx)
+    
+    return [candidates[i] for i in selected]
 
 
 def rerank_rrf(
@@ -128,26 +125,25 @@ def rerank_rrf(
     """
     # TODO: Implement RRF
     #
-    # rrf_scores = {}  # content -> score
-    # content_map = {}  # content -> full dict
-    #
-    # for ranked_list in ranked_lists:
-    #     for rank, item in enumerate(ranked_list, 1):
-    #         key = item["content"]
-    #         rrf_scores[key] = rrf_scores.get(key, 0) + 1 / (k + rank)
-    #         content_map[key] = item
-    #
-    # # Sort by RRF score
-    # sorted_items = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
-    #
-    # results = []
-    # for content, score in sorted_items[:top_k]:
-    #     item = content_map[content].copy()
-    #     item["score"] = score
-    #     results.append(item)
-    #
-    # return results
-    raise NotImplementedError("Implement rerank_rrf")
+    rrf_scores = {}  # content -> score
+    content_map = {}  # content -> full dict
+    
+    for ranked_list in ranked_lists:
+        for rank, item in enumerate(ranked_list, 1):
+            key = item["content"]
+            rrf_scores[key] = rrf_scores.get(key, 0) + 1 / (k + rank)
+            content_map[key] = item
+    
+     # Sort by RRF score
+    sorted_items = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
+    
+    results = []
+    for content, score in sorted_items[:top_k]:
+        item = content_map[content].copy()
+        item["score"] = score
+        results.append(item)
+    
+    return results
 
 
 # =============================================================================
@@ -185,12 +181,19 @@ def rerank(
 
 
 if __name__ == "__main__":
-    # Test with dummy data
-    dummy_candidates = [
-        {"content": "Chính sách trả hàng và hoàn tiền Shopee trong 15 ngày", "score": 0.8, "metadata": {}},
-        {"content": "Các phương thức thanh toán hỗ trợ trên Shopee Vietnam", "score": 0.6, "metadata": {}},
-        {"content": "Quy định đăng bán sản phẩm dành cho người bán", "score": 0.5, "metadata": {}},
+    # Test RRF fusion với 2 ranker giả lập: Semantic (dense) và BM25 (sparse)
+    semantic_results = [
+        {"content": "Chính sách trả hàng và hoàn tiền Shopee trong 15 ngày", "score": 0.82, "metadata": {}},
+        {"content": "Quy định đăng bán sản phẩm dành cho người bán", "score": 0.55, "metadata": {}},
+        {"content": "Các phương thức thanh toán hỗ trợ trên Shopee Vietnam", "score": 0.41, "metadata": {}},
     ]
-    results = rerank("chính sách trả hàng shopee", dummy_candidates, top_k=2)
+    bm25_results = [
+        {"content": "Các phương thức thanh toán hỗ trợ trên Shopee Vietnam", "score": 5.2, "metadata": {}},
+        {"content": "Chính sách trả hàng và hoàn tiền Shopee trong 15 ngày", "score": 4.1, "metadata": {}},
+        {"content": "Chính sách bảo mật thông tin người dùng", "score": 2.0, "metadata": {}},
+    ]
+
+    results = rerank_rrf([semantic_results, bm25_results], top_k=3, k=60)
+    print("RRF fused results (Semantic + BM25):")
     for r in results:
-        print(f"[{r['score']:.3f}] {r['content']}")
+        print(f"[{r['score']:.4f}] {r['content']}")
