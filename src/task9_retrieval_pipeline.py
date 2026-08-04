@@ -38,7 +38,7 @@ from .task8_pageindex_vectorless import pageindex_search
 # TODO: Calibrate threshold này bằng cách tự đo điểm cosine của semantic_search
 # cho câu hỏi liên quan vs câu hỏi lạc đề (xem ghi chú ở trên) — ĐỪNG copy nguyên
 # giá trị mẫu, mỗi corpus/embedding model sẽ cho khoảng điểm khác nhau.
-SCORE_THRESHOLD = 0.3   # Nếu best score (cosine gốc) < threshold → fallback PageIndex
+SCORE_THRESHOLD = 0.48  # Nếu best score (cosine gốc) < threshold → fallback PageIndex
 DEFAULT_TOP_K = 5
 RERANK_METHOD = "rrf"  # "cross_encoder" | "mmr" | "rrf"
 
@@ -103,7 +103,39 @@ def retrieve(
     #         return fallback
     #
     # return final_results[:top_k]
-    raise NotImplementedError("Implement retrieve")
+    if not query.strip() or top_k <= 0:
+        return []
+
+    search_k = max(top_k * 2, top_k)
+    dense_results = semantic_search(query, top_k=search_k)
+    sparse_results = lexical_search(query, top_k=search_k)
+
+    merged = rerank_rrf([dense_results, sparse_results], top_k=search_k)
+    for item in merged:
+        item["source"] = "hybrid"
+
+    if use_reranking and RERANK_METHOD != "rrf" and merged:
+        try:
+            final_results = rerank(query, merged, top_k=top_k, method=RERANK_METHOD)
+        except NotImplementedError:
+            final_results = merged[:top_k]
+    else:
+        final_results = merged[:top_k]
+
+    # Compare the original dense cosine score, never the tiny fused RRF score.
+    best_score = dense_results[0]["score"] if dense_results else 0.0
+    if best_score < score_threshold:
+        print(f"  Semantic best score ({best_score:.3f}) < threshold ({score_threshold})")
+        try:
+            fallback = pageindex_search(query, top_k=top_k)
+        except NotImplementedError:
+            fallback = []
+        if fallback:
+            for item in fallback:
+                item["source"] = "pageindex"
+            return fallback[:top_k]
+
+    return final_results[:top_k]
 
 
 if __name__ == "__main__":
