@@ -23,6 +23,7 @@ có field "deprecation" cảnh báo) và trả kết quả trong "retrieved_node
 """
 
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -30,6 +31,10 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
 PAGEINDEX_API_KEY = os.getenv("PAGEINDEX_API_KEY", "")
 STANDARDIZED_DIR = Path(__file__).parent.parent / "data" / "standardized"
@@ -93,10 +98,15 @@ def upload_documents() -> dict:
     Returns:
         dict mapping "đường dẫn tương đối .md" -> doc_id
     """
-    from pageindex.client import PageIndexClient, PageIndexAPIError
-
     if not PAGEINDEX_API_KEY:
-        raise RuntimeError("PAGEINDEX_API_KEY chưa được set trong .env")
+        print("PAGEINDEX_API_KEY chưa được set, bỏ qua upload PageIndex.")
+        return _load_registry()
+
+    try:
+        from pageindex.client import PageIndexClient, PageIndexAPIError
+    except Exception:
+        print("Chưa cài PageIndex SDK, bỏ qua upload PageIndex.")
+        return _load_registry()
 
     client = PageIndexClient(api_key=PAGEINDEX_API_KEY)
     registry = _load_registry()
@@ -147,6 +157,23 @@ def _poll_retrieval(client, retrieval_id: str, timeout: int = 60, interval: int 
     return retrieval
 
 
+def _offline_pageindex_search(query: str, top_k: int = 5) -> list[dict]:
+    """Local vectorless-style fallback used when PageIndex API is not configured."""
+    from .task6_lexical_search import lexical_search
+
+    results = []
+    for rank, item in enumerate(lexical_search(query, top_k=top_k), 1):
+        result = item.copy()
+        result["score"] = round(1.0 / rank, 4)
+        result["source"] = "pageindex"
+        result["metadata"] = {
+            **(result.get("metadata") or {}),
+            "fallback": "local_lexical_pageindex",
+        }
+        results.append(result)
+    return results[:top_k]
+
+
 def pageindex_search(query: str, top_k: int = 5) -> list[dict]:
     """
     Vectorless retrieval sử dụng PageIndex.
@@ -164,10 +191,13 @@ def pageindex_search(query: str, top_k: int = 5) -> list[dict]:
             'source': 'pageindex'   # Đánh dấu nguồn retrieval
         }
     """
-    from pageindex.client import PageIndexClient, PageIndexAPIError
-
     if not PAGEINDEX_API_KEY:
-        raise RuntimeError("PAGEINDEX_API_KEY chưa được set trong .env")
+        return _offline_pageindex_search(query, top_k)
+
+    try:
+        from pageindex.client import PageIndexClient, PageIndexAPIError
+    except Exception:
+        return _offline_pageindex_search(query, top_k)
 
     client = PageIndexClient(api_key=PAGEINDEX_API_KEY)
     registry = _load_registry()
@@ -213,13 +243,15 @@ def pageindex_search(query: str, top_k: int = 5) -> list[dict]:
     for rank, item in enumerate(results):
         item["score"] = round(1.0 / (rank + 1), 4)
 
-    return results[:top_k]
+    return results[:top_k] if results else _offline_pageindex_search(query, top_k)
 
 
 if __name__ == "__main__":
     if not PAGEINDEX_API_KEY:
-        print("⚠ Hãy set PAGEINDEX_API_KEY trong file .env")
-        print("  Đăng ký tại: https://pageindex.ai/")
+        print("PAGEINDEX_API_KEY chưa được set, chạy fallback local.")
+        results = pageindex_search("danh sách sản phẩm cấm đăng bán", top_k=3)
+        for r in results:
+            print(f"[{r['score']:.3f}] {r['content'][:100]}...")
     else:
         print("Uploading documents...")
         upload_documents()

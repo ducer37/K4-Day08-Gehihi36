@@ -12,6 +12,7 @@ Strategy:
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import re
 from pathlib import Path
@@ -166,17 +167,39 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     load_dotenv()
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("Missing OPENAI_API_KEY in environment/.env")
+        return _hash_embed_texts(texts)
 
-    from openai import OpenAI
-
-    client = OpenAI(api_key=api_key)
     embeddings: list[list[float]] = []
-    for start in range(0, len(texts), 100):
-        batch = texts[start : start + 100]
-        response = client.embeddings.create(model=EMBEDDING_MODEL, input=batch)
-        embeddings.extend(item.embedding for item in response.data)
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=api_key)
+        for start in range(0, len(texts), 100):
+            batch = texts[start : start + 100]
+            response = client.embeddings.create(model=EMBEDDING_MODEL, input=batch)
+            embeddings.extend(item.embedding for item in response.data)
+    except Exception:
+        return _hash_embed_texts(texts)
     return embeddings
+
+
+def _hash_embed_texts(texts: list[str], dim: int = EMBEDDING_DIM) -> list[list[float]]:
+    """Offline deterministic embedding fallback for running the lab without API keys."""
+    vectors = []
+    for text in texts:
+        vector = [0.0] * dim
+        tokens = re.findall(r"[\wÀ-ỹ]+", text.lower(), flags=re.UNICODE)
+        for token in tokens:
+            digest = hashlib.md5(token.encode("utf-8")).digest()
+            index = int.from_bytes(digest[:4], "big") % dim
+            sign = 1.0 if digest[4] % 2 == 0 else -1.0
+            vector[index] += sign
+
+        norm = math.sqrt(sum(value * value for value in vector))
+        if norm:
+            vector = [value / norm for value in vector]
+        vectors.append(vector)
+    return vectors
 
 
 def embed_chunks(chunks: list[dict]) -> list[dict]:

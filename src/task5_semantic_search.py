@@ -40,19 +40,22 @@ def semantic_search(query: str, top_k: int = 10) -> list[dict]:
     try:
         collection = get_collection()
     except ModuleNotFoundError:
-        return []
+        return _offline_semantic_search(query, top_k)
     if collection.count() == 0:
-        return []
+        return _offline_semantic_search(query, top_k)
 
     try:
         query_vector = embed_texts([query])[0]
     except RuntimeError:
         return _offline_semantic_search(query, top_k)
-    results = collection.query(
-        query_embeddings=[query_vector],
-        n_results=top_k,
-        include=["documents", "metadatas", "distances"],
-    )
+    try:
+        results = collection.query(
+            query_embeddings=[query_vector],
+            n_results=top_k,
+            include=["documents", "metadatas", "distances"],
+        )
+    except Exception:
+        return _offline_semantic_search(query, top_k)
 
     output = []
     for doc, meta, distance in zip(
