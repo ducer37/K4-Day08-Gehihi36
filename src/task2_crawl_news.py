@@ -33,10 +33,18 @@ def setup_directory():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# TODO: Điền danh sách URL bài viết cần crawl
+# Danh sách 10 bài viết hướng dẫn hỗ trợ khách hàng từ Shopee Help Center
 ARTICLE_URLS = [
-    # Ví dụ (trang công khai Shopee Vietnam):
-    # "https://help.shopee.vn/portal/4/article/...",
+    "https://help.shopee.vn/portal/4/article/79089",  # Shopee: Hướng dẫn trả hàng / hoàn tiền
+    "https://help.shopee.vn/portal/4/article/79088",  # Shopee: Theo dõi đơn hàng
+    "https://help.shopee.vn/portal/4/article/79090",  # Shopee: Shopee Mall là gì?
+    "https://help.shopee.vn/portal/4/article/79102",  # Shopee: Mua hàng xuyên biên giới
+    "https://help.shopee.vn/portal/4/article/79076",  # Shopee: Thay đổi / huỷ đơn hàng
+    "https://help.shopee.vn/portal/4/article/79334",  # Shopee: Xử lý đơn hàng bởi Shopee
+    "https://help.shopee.vn/portal/4/article/79099",  # Shopee: Đánh giá sản phẩm
+    "https://tiki.vn/chuyen-muc/chinh-sach-mua-hang.html",           # Tiki: Chính sách mua hàng
+    "https://tiki.vn/chuyen-muc/chinh-sach-doi-tra-hang.html",       # Tiki: Chính sách đổi trả
+    "https://tiki.vn/chuyen-muc/phuong-thuc-thanh-toan.html",        # Tiki: Phương thức thanh toán
 ]
 
 
@@ -54,16 +62,23 @@ async def crawl_article(url: str) -> dict:
     """
     from crawl4ai import AsyncWebCrawler
 
-    # TODO: Implement crawling logic
-    # async with AsyncWebCrawler() as crawler:
-    #     result = await crawler.arun(url=url)
-    #     return {
-    #         "url": url,
-    #         "title": result.metadata.get("title", "Unknown"),
-    #         "date_crawled": datetime.now().isoformat(),
-    #         "content_markdown": result.markdown,
-    #     }
-    raise NotImplementedError("Implement crawl_article")
+    async with AsyncWebCrawler(headless=True) as crawler:
+        result = await crawler.arun(url=url)
+
+        # Lấy title từ metadata, fallback về URL nếu không có
+        title = "Hướng dẫn Shopee"
+        if result.metadata and result.metadata.get("title"):
+            title = result.metadata["title"]
+
+        # Ưu tiên dùng markdown, fallback về text thuần nếu không có
+        content = result.markdown or result.cleaned_html or ""
+
+        return {
+            "url": url,
+            "title": title,
+            "date_crawled": datetime.now().isoformat(),
+            "content_markdown": content,
+        }
 
 
 async def crawl_all():
@@ -72,13 +87,19 @@ async def crawl_all():
 
     for i, url in enumerate(ARTICLE_URLS, 1):
         print(f"[{i}/{len(ARTICLE_URLS)}] Crawling: {url}")
-        article = await crawl_article(url)
+        try:
+            article = await crawl_article(url)
 
-        # Lưu file JSON
-        filename = f"article_{i:02d}.json"
-        filepath = DATA_DIR / filename
-        filepath.write_text(json.dumps(article, ensure_ascii=False, indent=2))
-        print(f"  ✓ Saved: {filepath}")
+            # Lưu file JSON
+            filename = f"article_{i:02d}.json"
+            filepath = DATA_DIR / filename
+            filepath.write_text(
+                json.dumps(article, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            print(f"  ✓ Saved: {filepath} ({len(article['content_markdown'])} chars)")
+        except Exception as e:
+            print(f"  ✗ Lỗi khi crawl {url}: {e}")
 
 
 if __name__ == "__main__":
