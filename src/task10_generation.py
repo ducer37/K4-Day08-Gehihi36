@@ -41,7 +41,7 @@ TOP_P = 0.9
 # Chọn 0.3 vì: RAG cần factual, ít sáng tạo
 TEMPERATURE = 0.3
 
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-nano")
+OPENAI_MODEL = "gpt-5-nano"
 
 
 # =============================================================================
@@ -150,6 +150,12 @@ def generate_with_citation(query: str, top_k: int = TOP_K) -> dict:
             "answer": "Tôi không thể xác minh thông tin này từ nguồn hiện có",
             "sources": [],
             "retrieval_source": "none",
+        }
+    if chunks[0].get("score", 0.0) < 0.01:
+        return {
+            "answer": "Tôi không thể xác minh thông tin này từ nguồn hiện có",
+            "sources": chunks,
+            "retrieval_source": chunks[0].get("source", "hybrid"),
         }
 
     user_message = f"""Context:

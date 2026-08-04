@@ -17,6 +17,7 @@ DATA_DIR = ROOT / "data"
 STANDARDIZED_DIR = DATA_DIR / "standardized"
 LOG_FILE = DEMO_DIR / "logs" / "rag_demo_logs.jsonl"
 GOLDEN_DATASET_PATH = ROOT / "group_project" / "evaluation" / "golden_dataset.json"
+OPENAI_MODEL = "gpt-5-nano"
 
 sys.path.insert(0, str(ROOT))
 
@@ -71,7 +72,7 @@ def status_payload() -> dict:
             {"id": "CP5", "title": "Evaluation & UI", "state": "completed", "items": ["demo UI ready", f"golden dataset: {qa_count} Q&A", "eval_pipeline.py and results.md found"]},
             {"id": "CP6", "title": "Demo readiness", "state": "completed", "items": ["source display", "observable trace", "JSONL logs"]},
         ],
-        "config": {"embedding_model": os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"), "model_name": os.getenv("OPENAI_MODEL", "gpt-5-nano"), "top_k": 5, "score_threshold": 0.48},
+        "config": {"embedding_model": os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"), "model_name": OPENAI_MODEL, "top_k": 5, "score_threshold": 0.48},
     }
 
 
@@ -129,6 +130,26 @@ def matching_testcase(query: str) -> dict | None:
     return None
 
 
+def unsupported_specific_terms(query: str, sources: list[dict]) -> list[str]:
+    evidence = normalized(" ".join(source.get("content", "") for source in sources))
+    common = {"shopee", "mall", "cod", "spaylater", "napas", "return", "refund", "policy", "seller", "buyer"}
+    missing = []
+    for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9+-]*", query):
+        t = token.casefold()
+        if t in common:
+            continue
+        if token.isdigit() or len(t) >= 4:
+            if t not in evidence:
+                missing.append(token)
+    return missing
+
+
+def out_of_scope(query: str) -> bool:
+    text = normalized(query)
+    other_marketplaces = ["lazada", "tiki", "sendo", "amazon", "tiktok shop", "temu"]
+    return any(name in text for name in other_marketplaces) and "shopee" not in text
+
+
 def local_documents() -> list[dict]:
     docs = []
     for path in STANDARDIZED_DIR.rglob("*.md"):
@@ -182,6 +203,8 @@ def retrieve_with_trace(query: str, cfg: dict, trace: list[dict]) -> tuple[list[
 
     metrics["retrieval_latency_ms"] = round((time.perf_counter() - started) * 1000, 1)
     best_dense = dense[0]["score"] if dense else 0.0
+    metrics["best_dense_score"] = round(best_dense, 4)
+    dense_scores = {item["content"]: item["score"] for item in dense}
 
     s = time.perf_counter()
     if cfg["use_reranking"]:
@@ -204,26 +227,31 @@ def retrieve_with_trace(query: str, cfg: dict, trace: list[dict]) -> tuple[list[
                 item["source"] = "pageindex"
             trace.append(event("pageindex_fallback_done", "completed", s, "Fallback returned results.", f"{len(fallback)} results"))
             return fallback[: cfg["top_k"]], metrics
+        trace.append(event("pageindex_fallback_done", "completed", s, "Fallback found no reliable evidence."))
+        return [], metrics
     else:
         trace.append(event("fallback_check", "completed", s, f"Best cosine {best_dense:.3f} passed threshold."))
 
     for item in merged:
         item["source"] = "hybrid"
+        item["vector_score"] = dense_scores.get(item["content"])
     return merged[: cfg["top_k"]], metrics
 
 
 def format_source(item: dict) -> dict:
     meta = item.get("metadata") or {}
     content = item.get("content", "")
+    role_match = re.search(r"CUSTOMER_ROLE:\s*(buyer|seller|both)", content, flags=re.IGNORECASE)
     return {
         "content": content,
         "content_preview": content[:560].rstrip() + ("…" if len(content) > 560 else ""),
         "score": round(float(item.get("score", 0.0)), 4),
+        "vector_score": None if item.get("vector_score") is None else round(float(item.get("vector_score")), 4),
         "score_kind": "rrf" if item.get("source") == "hybrid" else "similarity",
         "source": item.get("source", "hybrid"),
         "retrieval_source": item.get("source", "hybrid"),
         "type": meta.get("type", "unknown"),
-        "customer_role": meta.get("customer_role", "unknown"),
+        "customer_role": role_match.group(1).lower() if role_match else meta.get("customer_role", "unknown"),
         "metadata": meta,
     }
 
@@ -260,11 +288,14 @@ def polish_sources_for_demo(query: str, sources: list[dict]) -> list[dict]:
 
 def answer_from_sources(query: str, sources: list[dict], cfg: dict) -> tuple[str, dict]:
     if not sources:
-        return "I cannot verify this information", {}
+        return "Tôi chưa có đủ bằng chứng trong kho tài liệu Shopee để trả lời. Bạn có thể hỏi rõ hơn về chính sách Shopee hoặc chọn một testcase có sẵn.", {}
     testcase = matching_testcase(query)
     if testcase:
         citation = testcase["expected_context"].split(";")[0].strip()
         return f"{testcase['expected_answer']} [{citation}, 2026]", {}
+    missing_terms = unsupported_specific_terms(query, sources)
+    if missing_terms:
+        return f"Tôi chưa có đủ bằng chứng trong kho tài liệu Shopee về {', '.join(missing_terms)} để trả lời chắc chắn. Bạn có thể hỏi lại theo chính sách Shopee chung hoặc cung cấp thêm tài liệu liên quan.", {}
     if cfg["use_llm"] and os.getenv("OPENAI_API_KEY"):
         try:
             from openai import OpenAI
@@ -273,13 +304,12 @@ def answer_from_sources(query: str, sources: list[dict], cfg: dict) -> tuple[str
             system = "Answer in Vietnamese using only context. Cite every factual claim as [source, 2026]. If unsupported, say I cannot verify this information."
             user = f"Context:\n{context}\n\nQuestion: {query}"
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            model = os.getenv("OPENAI_MODEL", "gpt-5-nano")
-            if model.startswith("gpt-5"):
-                response = client.responses.create(model=model, input=f"{system}\n\n{user}")
+            if OPENAI_MODEL.startswith("gpt-5"):
+                response = client.responses.create(model=OPENAI_MODEL, input=f"{system}\n\n{user}")
                 usage = getattr(response, "usage", None)
                 return response.output_text or "", {"total_tokens": getattr(usage, "total_tokens", None)}
             response = client.chat.completions.create(
-                model=model,
+                model=OPENAI_MODEL,
                 temperature=0.2,
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             )
@@ -315,6 +345,10 @@ def run_chat(query: str, cfg: dict) -> dict:
     if not query.strip():
         return {"answer": "I cannot verify this information", "sources": [], "trace": trace, "metrics": {"top_k": cfg["top_k"], "score_threshold": cfg["score_threshold"]}}
     s = time.perf_counter(); trace.append(event("validate_input", "completed", s, "Query is non-empty."))
+    if out_of_scope(query):
+        trace.append(event("scope_check", "completed", time.perf_counter(), "Question is outside the Shopee evidence scope."))
+        answer = "Tôi chỉ có kho bằng chứng về Shopee trong demo này, chưa có tài liệu đủ tin cậy về Lazada hoặc sàn khác. Bạn muốn hỏi lại theo ngữ cảnh Shopee không?"
+        return {"answer": answer, "sources": [], "trace": trace, "metrics": {"top_k": cfg["top_k"], "score_threshold": cfg["score_threshold"], "model_name": OPENAI_MODEL if cfg["use_llm"] else "context-fallback", **cfg}}
 
     raw_sources, metrics = retrieve_with_trace(query, cfg, trace)
     sources = polish_sources_for_demo(query, [format_source(item) for item in raw_sources])
@@ -328,7 +362,7 @@ def run_chat(query: str, cfg: dict) -> dict:
     trace.append(event("final_answer", "completed", time.perf_counter(), "Returned answer, sources, trace, and metrics."))
 
     metrics.update(usage)
-    metrics.update({"total_latency_ms": round((time.perf_counter() - started) * 1000, 1), "estimated_tokens": len(query.split()) + len(answer.split()), "model_name": os.getenv("OPENAI_MODEL", "gpt-5-nano") if cfg["use_llm"] else "context-fallback", "embedding_model": os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"), **cfg})
+    metrics.update({"total_latency_ms": round((time.perf_counter() - started) * 1000, 1), "estimated_tokens": len(query.split()) + len(answer.split()), "model_name": OPENAI_MODEL if cfg["use_llm"] else "context-fallback", "embedding_model": os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"), **cfg})
     return {"answer": answer or "I cannot verify this information", "sources": sources, "trace": trace, "metrics": metrics}
 
 

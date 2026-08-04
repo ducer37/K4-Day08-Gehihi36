@@ -25,4 +25,13 @@ assert all(key in result for key in ("answer", "sources", "trace", "metrics")), 
 assert result["answer"] and isinstance(result["trace"], list)
 assert result["metrics"]["top_k"] == 3, result["metrics"]
 assert result["metrics"]["score_threshold"] == 0.48, result["metrics"]
+
+for query in ("Lazada hoàn tiền trong bao lâu?", "Shopee có chính sách bảo hành iPhone 18 trong bao lâu?"):
+    req = Request(
+        BASE + "/api/chat",
+        data=json.dumps({"query": query, "top_k": 3, "score_threshold": 0.48, "use_reranking": True}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    guarded = json.load(urlopen(req))
+    assert "chưa có" in guarded["answer"].lower() or "chưa đủ" in guarded["answer"].lower(), guarded["answer"]
 print("Smoke test passed: testcases, answer, sources, trace, and metrics returned.")

@@ -59,7 +59,25 @@ function addTrace(t, inlineTrace) {
 function drawSources(items) {
   sourcesBox.classList.remove("empty");
   sourcesBox.innerHTML = items.length
-    ? items.map((s, i) => `<article class="source"><div class="source-top"><span>#${i + 1} · ${esc(s.metadata?.source || s.source)}</span><span>${s.match_score ?? 0}% match</span></div><div class="badges"><i class="badge">${esc(s.type)}</i><i class="badge">${esc(s.customer_role)}</i><i class="badge">${esc(s.retrieval_source)}</i><i class="badge">raw ${esc(s.score_kind || "score")}: ${s.score}</i>${s.expected_match ? `<i class="badge good">expected source</i>` : ""}</div><p>${esc(s.content_preview)}</p></article>`).join("")
+    ? items.map((s, i) => {
+        const isRrf = (s.score_kind || "") === "rrf";
+        const vectorScore = s.vector_score ?? "—";
+        const rrf = isRrf ? s.score : "—";
+        const raw = isRrf ? "—" : s.score;
+        return `<article class="source">
+          <div class="source-top"><span>#${i + 1} · ${esc(s.metadata?.source || s.source)}</span><span>vector sim: ${vectorScore}</span></div>
+          <div class="badges">
+            <i class="badge">RRF: ${rrf}</i>
+            <i class="badge">vector sim: ${vectorScore}</i>
+            <i class="badge">raw score: ${raw}</i>
+            <i class="badge">retrieval: ${esc(s.retrieval_source)}</i>
+            <i class="badge">role: ${esc(s.customer_role)}</i>
+            <i class="badge">type: ${esc(s.type)}</i>
+            ${s.expected_match ? `<i class="badge">expected source</i>` : ""}
+          </div>
+          <p>${esc(s.content_preview)}</p>
+        </article>`;
+      }).join("")
     : "No evidence matched the configured threshold.";
   $("#sourceCount").textContent = items.length;
 }
