@@ -1,77 +1,70 @@
-"""
-Task 6 — Lexical Search Module (BM25).
+"""Task 6 - BM25 lexical search over the same chunks used for indexing."""
 
-Mặc định sử dụng BM25. Nếu dùng phương pháp khác (TF-IDF, Elasticsearch,
-Weaviate BM25 built-in), hãy giải thích cơ chế trong buổi demo → +5 bonus.
+from __future__ import annotations
 
-Cài đặt:
-    pip install rank-bm25
+import re
 
-BM25 hoạt động thế nào:
-    - Term Frequency (TF): từ xuất hiện nhiều trong document → điểm cao
-    - Inverse Document Frequency (IDF): từ hiếm → quan trọng hơn
-    - Document length normalization: document dài không bị ưu tiên quá mức
-    - Formula: score(q,d) = Σ IDF(qi) * (tf(qi,d) * (k1+1)) / (tf(qi,d) + k1*(1-b+b*|d|/avgdl))
-    - k1=1.5 (term saturation), b=0.75 (length normalization)
-"""
+from .task4_chunking_indexing import chunk_documents, load_documents
 
-from pathlib import Path
+CORPUS: list[dict] = []
+BM25 = None
 
-# TODO: Load corpus từ data/standardized/ hoặc từ vector store
-CORPUS: list[dict] = []  # List of {'content': str, 'metadata': dict}
+
+def _tokenize(text: str) -> list[str]:
+    return re.findall(r"[\wÀ-ỹ]+", text.lower(), flags=re.UNICODE)
 
 
 def build_bm25_index(corpus: list[dict]):
-    """
-    Xây dựng BM25 index từ corpus.
+    tokenized_corpus = [_tokenize(doc["content"]) for doc in corpus]
+    try:
+        from rank_bm25 import BM25Okapi
+        return BM25Okapi(tokenized_corpus)
+    except Exception:
+        return tokenized_corpus
 
-    Args:
-        corpus: List of {'content': str, 'metadata': dict}
-    """    
-    from rank_bm25 import BM25Okapi
-    
-    # Tokenize - có thể đơn giản split(), hoặc dùng underthesea cho tiếng Việt
-    tokenized_corpus = [doc["content"].lower().split() for doc in corpus]
-    bm25 = BM25Okapi(tokenized_corpus)
-    return bm25
+
+def _ensure_index():
+    global CORPUS, BM25
+    if CORPUS and BM25 is not None:
+        return
+    CORPUS = chunk_documents(load_documents())
+    BM25 = build_bm25_index(CORPUS)
+
+
+def _fallback_scores(tokenized_query: list[str], tokenized_corpus: list[list[str]]) -> list[float]:
+    query = set(tokenized_query)
+    return [float(sum(1 for token in doc if token in query)) for doc in tokenized_corpus]
 
 
 def lexical_search(query: str, top_k: int = 10) -> list[dict]:
-    """
-    Tìm kiếm từ khóa sử dụng BM25.
+    if not query.strip() or top_k <= 0:
+        return []
 
-    Args:
-        query: Câu truy vấn
-        top_k: Số lượng kết quả tối đa
+    _ensure_index()
+    if not CORPUS:
+        return []
 
-    Returns:
-        List of {
-            'content': str,
-            'score': float,      # BM25 score
-            'metadata': dict
-        }
-        Sorted by score descending.
-    """
-    tokenized_query = query.lower().split()
-    scores = bm25.get_scores(tokenized_query)
-    
-    # Get top_k indices
-    import numpy as np
-    top_indices = np.argsort(scores)[::-1][:top_k]
-    
+    tokenized_query = _tokenize(query)
+    if hasattr(BM25, "get_scores"):
+        scores = [float(score) for score in BM25.get_scores(tokenized_query)]
+    else:
+        scores = _fallback_scores(tokenized_query, BM25)
+
+    ranked = sorted(enumerate(scores), key=lambda item: item[1], reverse=True)
     results = []
-    for idx in top_indices:
-        if scores[idx] > 0:
-            results.append({
-                "content": CORPUS[idx]["content"],
-                "score": float(scores[idx]),
-                "metadata": CORPUS[idx]["metadata"]
-            })
+    for index, score in ranked[:top_k]:
+        if score <= 0:
+            continue
+        results.append(
+            {
+                "content": CORPUS[index]["content"],
+                "score": score,
+                "metadata": CORPUS[index]["metadata"],
+            }
+        )
     return results
 
 
 if __name__ == "__main__":
-    # Test
-    results = lexical_search("phương thức thanh toán shopee", top_k=5)
-    for r in results:
-        print(f"[{r['score']:.3f}] {r['content'][:100]}...")
+    for result in lexical_search("phương thức thanh toán shopee", top_k=5):
+        print(f"[{result['score']:.3f}] {result['content'][:100]}...")
