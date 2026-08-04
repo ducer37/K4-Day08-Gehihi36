@@ -41,7 +41,7 @@ TOP_P = 0.9
 # Chọn 0.3 vì: RAG cần factual, ít sáng tạo
 TEMPERATURE = 0.3
 
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-nano")
 
 
 # =============================================================================
@@ -166,16 +166,20 @@ Question: {query}"""
             from openai import OpenAI
 
             client = OpenAI(api_key=openai_key)
-            response = client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_message},
-                ],
-                temperature=TEMPERATURE,
-                top_p=TOP_P,
-            )
-            answer = response.choices[0].message.content or ""
+            if OPENAI_MODEL.startswith("gpt-5"):
+                response = client.responses.create(model=OPENAI_MODEL, input=f"{SYSTEM_PROMPT}\n\n{user_message}")
+                answer = response.output_text or ""
+            else:
+                response = client.chat.completions.create(
+                    model=OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user_message},
+                    ],
+                    temperature=TEMPERATURE,
+                    top_p=TOP_P,
+                )
+                answer = response.choices[0].message.content or ""
         except Exception:
             answer = ""
 

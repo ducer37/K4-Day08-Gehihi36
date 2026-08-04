@@ -52,6 +52,10 @@ def _clean_text(text: str) -> str:
 
 
 def _customer_role(path: Path, content: str) -> str:
+    role_match = re.search(r"CUSTOMER_ROLE:\s*(buyer|seller|both)", content, flags=re.IGNORECASE)
+    if role_match:
+        return role_match.group(1).lower()
+
     name = path.stem.lower()
     if any(word in name for word in ["seller", "manage", "dang-ban", "shop"]):
         return "seller"

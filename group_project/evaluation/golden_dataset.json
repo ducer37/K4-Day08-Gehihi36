@@ -1,17 +1,102 @@
 [
   {
-    "question": "Người mua có thể yêu cầu trả hàng/hoàn tiền trong thời hạn bao lâu sau khi nhận hàng?",
-    "expected_answer": "Trong vòng 15 ngày kể từ khi giao hàng thành công (24 giờ đối với thực phẩm tươi sống/đông lạnh).",
-    "expected_context": "Trang Returns and Refunds Policy, mục Return/Refund Eligibility"
+    "question": "Người mua có thể gửi yêu cầu trả hàng/hoàn tiền trong thời hạn bao lâu sau khi đơn hàng giao thành công?",
+    "expected_answer": "Thông thường người mua có thể gửi yêu cầu trong vòng 15 ngày kể từ lúc đơn hàng được cập nhật giao hàng thành công.",
+    "expected_context": "shopee-general-return-refund-rules; CHÍNH SÁCH TRẢ HÀNG VÀ HOÀN TIỀN"
   },
   {
-    "question": "Shopee hỗ trợ những phương thức thanh toán nào?",
-    "expected_answer": "ShopeePay Wallet, thẻ tín dụng/ghi nợ, trả góp qua thẻ, QR Code, chuyển khoản qua app ngân hàng, thẻ NAPAS, Apple Pay, Google Pay, và COD.",
-    "expected_context": "Trang Payment Methods Overview"
+    "question": "Đối với thực phẩm tươi sống hoặc đông lạnh, thời hạn gửi yêu cầu trả hàng/hoàn tiền là bao lâu?",
+    "expected_answer": "Với thực phẩm tươi sống hoặc đông lạnh, thời hạn gửi yêu cầu trả hàng/hoàn tiền là 24 giờ kể từ khi đơn hàng được cập nhật giao hàng thành công.",
+    "expected_context": "shopee-general-return-refund-rules; Điều Khoản Dịch Vụ của Shopee Mall"
   },
   {
-    "question": "Người bán không được đăng bán những sản phẩm nào?",
-    "expected_answer": "Hàng giả/nhái, sản phẩm bất hợp pháp, vi phạm sở hữu trí tuệ, và các mặt hàng nằm trong danh sách cấm của sàn.",
-    "expected_context": "Trang Product Listing Regulations, mục Prohibited Content"
+    "question": "Shopee hiện có hỗ trợ đổi hàng trực tiếp không?",
+    "expected_answer": "Shopee hiện chưa hỗ trợ yêu cầu đổi hàng; nếu hàng có vấn đề, người mua có thể từ chối nhận hàng khi đồng kiểm hoặc gửi yêu cầu trả hàng/hoàn tiền sau khi nhận hàng.",
+    "expected_context": "shopee-general-return-refund-rules"
+  },
+  {
+    "question": "Những lý do phổ biến nào cho phép người mua yêu cầu trả hàng/hoàn tiền?",
+    "expected_answer": "Các lý do gồm chưa nhận được hàng, thiếu hàng, người bán gửi sai hàng, hàng hư hỏng/bể vỡ, hàng lỗi, hàng giả/nhái, hàng khác mô tả hoặc hết hạn sử dụng.",
+    "expected_context": "shopee-general-return-refund-rules; CHÍNH SÁCH TRẢ HÀNG VÀ HOÀN TIỀN"
+  },
+  {
+    "question": "Nếu yêu cầu trả hàng/hoàn tiền hiển thị trạng thái Shopee đang xem xét thì khi nào người mua nhận được kết quả?",
+    "expected_answer": "Shopee sẽ rà soát và gửi kết quả xử lý trong khoảng 3-5 ngày làm việc, không tính Chủ nhật và ngày lễ/Tết.",
+    "expected_context": "shopee-review-return-refund-request"
+  },
+  {
+    "question": "Người mua bổ sung bằng chứng cho yêu cầu trả hàng/hoàn tiền bằng những cách nào?",
+    "expected_answer": "Người mua có thể mở thông báo yêu cầu bổ sung bằng chứng để thêm hình/video và gửi, hoặc vào Tôi > Trả hàng/Hoàn tiền, chọn đơn hàng cần bổ sung rồi đăng tải bằng chứng.",
+    "expected_context": "shopee-review-return-refund-request"
+  },
+  {
+    "question": "Khi Shopee đồng ý Hoàn Tiền Ngay, người mua có cần trả hàng không?",
+    "expected_answer": "Không. Nếu Shopee đồng ý Hoàn Tiền Ngay, người mua nhận tiền hoàn mà không cần trả hàng.",
+    "expected_context": "shopee-review-return-refund-request; Điều Khoản Dịch Vụ của Shopee Mall"
+  },
+  {
+    "question": "Nếu Shopee chấp nhận phương án Trả hàng & Hoàn tiền, người mua phải gửi trả hàng trong bao lâu?",
+    "expected_answer": "Người mua cần chọn hình thức trả hàng và hoàn tất gửi trả hàng về kho Shopee hoặc người bán trong vòng 6 ngày kể từ khi nhận thông báo gửi trả hàng.",
+    "expected_context": "shopee-review-return-refund-request; Điều Khoản Dịch Vụ của Shopee Mall"
+  },
+  {
+    "question": "Các phương thức gửi hàng hoàn trả nào được Shopee nhắc đến?",
+    "expected_answer": "Các phương thức gồm đơn vị vận chuyển đến lấy hàng, trả hàng tại bưu cục và tự sắp xếp gửi trả.",
+    "expected_context": "shopee-return-shipping-methods-fees"
+  },
+  {
+    "question": "Với hình thức đơn vị vận chuyển đến lấy hàng, người mua cần lưu ý gì về số lần lấy hàng?",
+    "expected_answer": "Đơn vị vận chuyển chỉ hỗ trợ tối đa 3 lần lấy hàng khác nhau trong vòng 1-3 ngày kể từ ngày lấy hàng người mua đã chọn.",
+    "expected_context": "shopee-return-shipping-methods-fees"
+  },
+  {
+    "question": "Tiền hoàn về Ví ShopeePay thường mất bao lâu sau khi Shopee chấp nhận hoàn tiền?",
+    "expected_answer": "Tiền hoàn về Ví ShopeePay thường được xử lý trong 24 giờ nếu ví vẫn hoạt động bình thường.",
+    "expected_context": "shopee-refund-time-status"
+  },
+  {
+    "question": "Hoàn tiền về thẻ tín dụng, thẻ ghi nợ, Apple Pay hoặc Google Pay thường mất bao lâu?",
+    "expected_answer": "Các phương thức này thường mất khoảng 7-14 ngày làm việc, tùy theo ngân hàng.",
+    "expected_context": "shopee-refund-time-status"
+  },
+  {
+    "question": "Người mua kiểm tra thông báo xác nhận hoàn tiền ở đâu?",
+    "expected_answer": "Người mua kiểm tra tại mục Thông báo > Cập nhật đơn hàng trên ứng dụng Shopee.",
+    "expected_context": "shopee-refund-time-status"
+  },
+  {
+    "question": "Người bán có thể quản lý đơn trả hàng/hoàn tiền ở đâu?",
+    "expected_answer": "Người bán quản lý tại Kênh Quản Lý Shop, mục Trả hàng/Hoàn tiền, bao gồm theo dõi trạng thái hàng hoàn và xử lý sau khi nhận hàng hoàn.",
+    "expected_context": "shopee-seller-manage-return-refund"
+  },
+  {
+    "question": "Nếu hàng hoàn đã về và còn nguyên vẹn, người bán nên thao tác gì?",
+    "expected_answer": "Người bán chọn Xác nhận Nhận hàng, chọn Nhập lại hàng vào kho, nhập số lượng thực tế và dùng Nhập tồn kho nhanh để hoàn tất.",
+    "expected_context": "shopee-seller-manage-return-refund"
+  },
+  {
+    "question": "Nếu hệ thống ghi nhận trả hàng thành công nhưng shop chưa nhận được hàng hoặc hàng hoàn có vấn đề, người bán cần làm gì?",
+    "expected_answer": "Người bán cần phản hồi cho Shopee theo hướng dẫn trong Kênh Quản Lý Shop để Shopee xử lý trường hợp chưa nhận hàng hoàn, hàng thất lạc hoặc hàng hoàn gặp vấn đề.",
+    "expected_context": "shopee-seller-manage-return-refund"
+  },
+  {
+    "question": "Chính sách bảo mật của Shopee áp dụng cho những ai?",
+    "expected_answer": "Chính sách bảo mật áp dụng cho cả Người bán và Người mua sử dụng Dịch vụ, trừ khi có tuyên bố rõ ràng ngược lại.",
+    "expected_context": "CHÍNH SÁCH BẢO MẬT"
+  },
+  {
+    "question": "Shopee định nghĩa dữ liệu cá nhân như thế nào?",
+    "expected_answer": "Dữ liệu cá nhân là dữ liệu về một cá nhân mà từ đó có thể xác định danh tính, hoặc có thể xác định khi kết hợp với thông tin khác mà tổ chức có hoặc có khả năng tiếp cận.",
+    "expected_context": "CHÍNH SÁCH BẢO MẬT"
+  },
+  {
+    "question": "Quy chế hoạt động Shopee yêu cầu sản phẩm, dịch vụ đăng bán phải đáp ứng điều kiện gì?",
+    "expected_answer": "Sản phẩm, dịch vụ phải đáp ứng quy định pháp luật liên quan, không thuộc trường hợp cấm kinh doanh/cấm quảng cáo, và không vi phạm chính sách, hướng dẫn, tiêu chuẩn cộng đồng của Shopee.",
+    "expected_context": "QUY CHẾ HOẠT ĐỘNG SÀN THƯƠNG MẠI ĐIỆN TỬ SHOPEE.VN"
+  },
+  {
+    "question": "Shopee Mall cho phép người mua yêu cầu trả hàng/hoàn tiền trong thời hạn nào?",
+    "expected_answer": "Người mua Shopee Mall có thể yêu cầu trong 24 giờ với thực phẩm tươi sống/đông lạnh và 15 ngày với các sản phẩm còn lại kể từ ngày sản phẩm được cung cấp lần đầu.",
+    "expected_context": "Điều Khoản Dịch Vụ của Shopee Mall"
   }
 ]
