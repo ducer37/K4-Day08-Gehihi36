@@ -8,9 +8,8 @@ Hướng dẫn:
     4. Yêu cầu LLM trả lời có citation
     5. Nếu không đủ evidence → "I cannot verify this information"
 
-Gợi ý LLM: OpenRouter có nhiều model gắn hậu tố ":free" không tính phí — xem
-https://openrouter.ai/models?max_price=0 — phù hợp nếu chưa có credit trả phí.
-Base URL: "https://openrouter.ai/api/v1", dùng chung interface với OpenAI SDK.
+LLM: dùng OpenAI API trực tiếp. Nếu thiếu OPENAI_API_KEY, hàm fallback bằng context
+retrieved để test/demo không crash.
 """
 
 import os
@@ -42,8 +41,7 @@ TOP_P = 0.9
 # Chọn 0.3 vì: RAG cần factual, ít sáng tạo
 TEMPERATURE = 0.3
 
-# TODO: Chọn LLM model (OpenRouter model ID)
-LLM_MODEL = "openai/gpt-4o-mini"  # hoặc model ":free" nếu chưa có credit
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
 # =============================================================================
@@ -82,14 +80,6 @@ def reorder_for_llm(chunks: list[dict]) -> list[dict]:
     Returns:
         List reordered để maximize LLM attention.
     """
-    # TODO: Implement reordering
-    #
-    # if len(chunks) <= 2:
-    #     return chunks
-    #
-    # front = chunks[::2]   # index 0, 2, 4 -> đặt ở đầu
-    # back = chunks[1::2]   # index 1, 3    -> đặt ở cuối (reversed)
-    # return front + back[::-1]
     if len(chunks) <= 2:
         return list(chunks)
 
@@ -113,17 +103,6 @@ def format_context(chunks: list[dict]) -> str:
     Returns:
         Formatted context string.
     """
-    # TODO: Implement context formatting
-    #
-    # context_parts = []
-    # for i, chunk in enumerate(chunks, 1):
-    #     source = chunk.get("metadata", {}).get("source", f"Source {i}")
-    #     doc_type = chunk.get("metadata", {}).get("type", "unknown")
-    #     context_parts.append(
-    #         f"[Document {i} | Source: {source} | Type: {doc_type}]\n"
-    #         f"{chunk['content']}\n"
-    #     )
-    # return "\n---\n".join(context_parts)
     context_parts = []
     for i, chunk in enumerate(chunks, 1):
         metadata = chunk.get("metadata", {}) or {}
@@ -162,43 +141,6 @@ def generate_with_citation(query: str, top_k: int = TOP_K) -> dict:
             'retrieval_source': str  # 'hybrid' hoặc 'pageindex'
         }
     """
-    # TODO: Implement generation pipeline
-    #
-    # # Step 1: Retrieve
-    # chunks = retrieve(query, top_k=top_k)
-    #
-    # # Step 2: Reorder
-    # reordered = reorder_for_llm(chunks)
-    #
-    # # Step 3: Format context
-    # context = format_context(reordered)
-    #
-    # # Step 4: Build prompt
-    # user_message = f"""Context:\n{context}\n\n---\n\nQuestion: {query}"""
-    #
-    # # Step 5: Call LLM (OpenRouter — OpenAI-compatible API)
-    # from openai import OpenAI
-    # api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
-    # client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
-    #
-    # response = client.chat.completions.create(
-    #     model=LLM_MODEL,
-    #     messages=[
-    #         {"role": "system", "content": SYSTEM_PROMPT},
-    #         {"role": "user", "content": user_message}
-    #     ],
-    #     temperature=TEMPERATURE,
-    #     top_p=TOP_P,
-    # )
-    #
-    # answer = response.choices[0].message.content
-    #
-    # # Step 6: Return
-    # return {
-    #     "answer": answer,
-    #     "sources": chunks,
-    #     "retrieval_source": chunks[0].get("source", "hybrid") if chunks else "none"
-    # }
     chunks = retrieve(query, top_k=top_k)
     reordered = reorder_for_llm(chunks)
     context = format_context(reordered)
@@ -217,15 +159,15 @@ def generate_with_citation(query: str, top_k: int = TOP_K) -> dict:
 
 Question: {query}"""
 
-    api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
     answer = ""
-    if api_key:
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if openai_key:
         try:
             from openai import OpenAI
 
-            client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+            client = OpenAI(api_key=openai_key)
             response = client.chat.completions.create(
-                model=LLM_MODEL,
+                model=OPENAI_MODEL,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_message},
@@ -241,7 +183,7 @@ Question: {query}"""
         first = reordered[0]
         metadata = first.get("metadata", {}) or {}
         source = metadata.get("source") or metadata.get("file") or "Nguồn tài liệu"
-        answer = f"{first.get('content', '').strip()} [{source}]"
+        answer = f"{first.get('content', '').strip()} [{source}, 2026]"
 
     return {
         "answer": answer,

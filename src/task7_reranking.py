@@ -14,7 +14,20 @@ bất kể nội dung đó có thật sự liên quan đến câu hỏi hay khô
 quyết định fallback ở Task 9 — xem ghi chú ở đó.
 """
 
+import math
+import os
 from typing import Optional
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+def cosine_sim(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+    return dot / (norm_a * norm_b) if norm_a and norm_b else 0.0
 
 
 def rerank_cross_encoder(
@@ -31,19 +44,24 @@ def rerank_cross_encoder(
     Returns:
         List of top_k candidates, re-scored và sorted by rerank_score descending.
     """
-    
-    #Option A: Jina Reranker API
+    api_key = os.getenv("JINA_API_KEY")
+    if not api_key:
+        return rerank_rrf([candidates], top_k=top_k)
+
+    # Option A: Jina Reranker API
     import requests
     response = requests.post(
         "https://api.jina.ai/v1/rerank",
-        headers={"Authorization": f"Bearer {JINA_API_KEY}"},
+        headers={"Authorization": f"Bearer {api_key}"},
         json={
             "model": "jina-reranker-v2-base-multilingual",
             "query": query,
             "documents": [c["content"] for c in candidates],
             "top_n": top_k
-        }
+        },
+        timeout=30,
     )
+    response.raise_for_status()
     reranked = response.json()["results"]
     return [
         {**candidates[r["index"]], "score": r["relevance_score"]}
@@ -75,8 +93,6 @@ def rerank_mmr(
     Returns:
         List of top_k candidates selected by MMR.
     """
-    # TODO: Implement MMR
-    
     selected = []
     remaining = list(range(len(candidates)))
     
@@ -123,8 +139,6 @@ def rerank_rrf(
     Returns:
         List of top_k candidates sorted by RRF score descending.
     """
-    # TODO: Implement RRF
-    #
     rrf_scores = {}  # content -> score
     content_map = {}  # content -> full dict
     
